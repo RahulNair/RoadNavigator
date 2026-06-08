@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Road Trip Navigator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #181c22;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f2f5;
+    --muted: #6b7280;
+    --accent: #00e5a0;
+    --accent-dim: rgba(0,229,160,0.12);
+    --warn: #f59e0b;
+    --warn-dim: rgba(245,158,11,0.12);
+    --danger: #ef4444;
+    --danger-dim: rgba(239,68,68,0.12);
+    --info: #60a5fa;
+    --info-dim: rgba(96,165,250,0.12);
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+
+  body { padding: 0; }
+
+  .top-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .top-bar h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; flex: 1; }
+  .gps-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 20px;
+  }
+  .gps-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
+  .gps-dot.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .setup-panel {
+    padding: 24px 20px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .setup-panel h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .setup-panel p { color: var(--muted); font-size: 13px; margin-bottom: 24px; line-height: 1.6; }
+
+  .input-group { margin-bottom: 16px; }
+  .input-group label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; font-family: var(--mono); }
+  .input-row { display: flex; gap: 8px; }
+  .input-group input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    padding: 14px 16px;
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-group input:focus { border-color: var(--accent); }
+  .input-group input.half { width: 50%; }
+  .unit-label {
+    background: var(--surface2); border: 1px solid var(--border2);
+    padding: 14px 14px; border-radius: 10px;
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    display: flex; align-items: center;
+  }
+
+  .btn-start {
+    width: 100%; padding: 16px;
+    background: var(--accent); color: #000;
+    border: none; border-radius: 12px;
+    font-family: var(--sans); font-size: 16px; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    cursor: pointer; margin-top: 24px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-start:active { transform: scale(0.98); opacity: 0.9; }
+
+  /* DASHBOARD */
+  #dashboard { display: none; padding-bottom: 80px; }
+
+  .pace-bar-wrap {
+    margin: 0; padding: 16px 20px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .pace-bar-label {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .pace-bar-track {
+    height: 6px; background: var(--surface2); border-radius: 3px; position: relative; overflow: visible;
+  }
+  .pace-bar-fill {
+    height: 100%; border-radius: 3px;
+    background: var(--accent);
+    transition: width 1s ease, background 0.5s;
+    position: relative;
+  }
+  .pace-bar-expected {
+    position: absolute; top: -3px; width: 2px; height: 12px;
+    background: var(--warn); border-radius: 1px;
+    transition: left 1s ease;
+  }
+  .pace-status {
+    margin-top: 8px;
+    font-family: var(--mono); font-size: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .columns {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1px; background: var(--border);
+    margin-bottom: 1px;
+  }
+  .col {
+    background: var(--bg);
+    padding: 16px;
+  }
+  .col-header {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    font-family: var(--mono); color: var(--muted);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+  }
+  .col-header span {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  }
+  .col-header span.live { background: var(--accent); }
+  .col-header span.target { background: var(--warn); }
+
+  .metric { margin-bottom: 14px; }
+  .metric-label { font-size: 10px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .metric-value { font-size: 26px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+  .metric-value.big { font-size: 34px; }
+  .metric-value .unit { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+  .metric-value.green { color: var(--accent); }
+  .metric-value.amber { color: var(--warn); }
+  .metric-value.red { color: var(--danger); }
+  .metric-value.blue { color: var(--info); }
+
+  .diff-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: var(--mono); font-size: 11px;
+    padding: 3px 8px; border-radius: 20px;
+    margin-top: 4px;
+  }
+  .diff-pill.ahead { background: var(--accent-dim); color: var(--accent); }
+  .diff-pill.behind { background: var(--danger-dim); color: var(--danger); }
+  .diff-pill.ontrack { background: var(--info-dim); color: var(--info); }
+
+  .bottom-strip {
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    position: fixed; bottom: 0; left: 0; right: 0;
+  }
+  .bottom-stat { text-align: center; }
+  .bottom-stat .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--mono); }
+  .bottom-stat .val { font-size: 14px; font-weight: 600; font-family: var(--mono); margin-top: 2px; }
+
+  .break-btn-wrap { padding: 12px 16px 0; display: flex; gap: 8px; }
+  .btn-break, .btn-end {
+    flex: 1; padding: 13px;
+    border: 1px solid var(--border2); border-radius: 10px;
+    background: var(--surface2); color: var(--text);
+    font-family: var(--sans); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, transform 0.1s;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .btn-break:active, .btn-end:active { transform: scale(0.98); }
+  .btn-break.on-break { background: var(--warn-dim); border-color: var(--warn); color: var(--warn); }
+  .btn-end { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+
+  .section-card {
+    background: var(--surface); border-top: 1px solid var(--border);
+    margin-top: 1px; padding: 16px;
+  }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-family: var(--mono); margin-bottom: 12px; }
+
+  .advice-box {
+    background: var(--surface2); border-radius: 10px;
+    border-left: 3px solid var(--accent);
+    padding: 12px 14px;
+    font-size: 14px; line-height: 1.6; color: var(--text);
+    font-family: var(--mono);
+    transition: border-color 0.5s;
+  }
+  .advice-box.warn { border-color: var(--warn); }
+  .advice-box.danger { border-color: var(--danger); }
+
+  .break-log { }
+  .break-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 12px;
+  }
+  .break-row:last-child { border-bottom: none; }
+  .break-num { color: var(--muted); min-width: 20px; }
+  .break-dur { margin-left: auto; color: var(--warn); }
+
+  .gps-error {
+    margin: 40px 20px;
+    background: var(--danger-dim); border: 1px solid var(--danger);
+    border-radius: 12px; padding: 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    color: var(--danger);
+  }
+  .gps-error strong { display: block; margin-bottom: 8px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>⚡ Road Nav</h1>
+  <div class="gps-badge">
+    <div class="gps-dot" id="gpsDot"></div>
+    <span id="gpsLabel">GPS off</span>
+  </div>
+</div>
+
+<!-- SETUP -->
+<div class="setup-panel" id="setupPanel">
+  <h2>Plan your trip</h2>
+  <p>Enter your target distance and time. Once started, GPS tracks your real position and tells you exactly how to pace yourself.</p>
+
+  <div class="input-group">
+    <label>Total distance</label>
+    <div class="input-row">
+      <input type="number" id="inpDist" value="1000" min="1" />
+      <div class="unit-label">km</div>
+    </div>
+  </div>
+
+  <div class="input-group">
+    <label>Target time (hours + minutes)</label>
+    <div class="input-row">
+      <input type="number" id="inpHours" value="16" min="0" max="99" class="half" placeholder="hrs" />
+      <div class="unit-label">h</div>
+      <input type="number" id="inpMins" value="0" min="0" max="59" class="half" placeholder="min" />
+      <div class="unit-label">m</div>
+    </div>
+  </div>
+
+  <button class="btn-start" onclick="startTrip()">Start GPS Trip</button>
+  <div id="gpsError"></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="pace-bar-wrap">
+    <div class="pace-bar-label">
+      <span>Start</span>
+      <span id="paceBarPct">0%</span>
+      <span id="inpDistLabel">1000 km</span>
+    </div>
+    <div class="pace-bar-track">
+      <div class="pace-bar-fill" id="paceBarFill" style="width:0%"></div>
+      <div class="pace-bar-expected" id="paceBarExp" style="left:0%"></div>
+    </div>
+    <div class="pace-status" id="paceStatus">
+      <span style="color:var(--muted)">Waiting for GPS lock…</span>
+    </div>
+  </div>
+
+  <div class="break-btn-wrap">
+    <button class="btn-break" id="btnBreak" onclick="toggleBreak()">☕ Break</button>
+    <button class="btn-end" onclick="endTrip()">🏁 End Trip</button>
+  </div>
+
+  <div class="columns">
+    <div class="col">
+      <div class="col-header"><span class="live"></span> Live</div>
+
+      <div class="metric">
+        <div class="metric-label">Current speed</div>
+        <div class="metric-value big green" id="liveSpeed">–<span class="unit">km/h</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Distance covered</div>
+        <div class="metric-value" id="liveDist">0<span class="unit">km</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Avg speed (total)</div>
+        <div class="metric-value" id="liveAvgTotal">–<span class="unit">km/h</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Avg speed (driving)</div>
+        <div class="metric-value" id="liveAvgDrive">–<span class="unit">km/h</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">ETA at current pace</div>
+        <div class="metric-value blue" id="liveETA">–</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="col-header"><span class="target"></span> Target</div>
+
+      <div class="metric">
+        <div class="metric-label">Required speed now</div>
+        <div class="metric-value big amber" id="targetSpeedNow">–<span class="unit">km/h</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Expected dist by now</div>
+        <div class="metric-value" id="targetDistNow">–<span class="unit">km</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Base target speed</div>
+        <div class="metric-value" id="targetSpeedBase">–<span class="unit">km/h</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Remaining distance</div>
+        <div class="metric-value" id="targetRemDist">–<span class="unit">km</span></div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Time remaining</div>
+        <div class="metric-value" id="targetRemTime">–</div>
+        <div id="paceDiff"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-title">Pace advice</div>
+    <div class="advice-box" id="adviceBox">Waiting for GPS data…</div>
+  </div>
+
+  <div class="section-card" id="breakSection" style="display:none">
+    <div class="section-title">Break log</div>
+    <div class="break-log" id="breakLog"></div>
+  </div>
+
+  <div style="height:80px"></div>
+</div>
+
+<div class="bottom-strip" id="bottomStrip" style="display:none">
+  <div class="bottom-stat">
+    <div class="lbl">Elapsed</div>
+    <div class="val" id="btmElapsed">0:00:00</div>
+  </div>
+  <div class="bottom-stat">
+    <div class="lbl">Break time</div>
+    <div class="val" id="btmBreak">0:00</div>
+  </div>
+  <div class="bottom-stat">
+    <div class="lbl">Target arrival</div>
+    <div class="val" id="btmArrival">–</div>
+  </div>
+</div>
+
+<script>
+let tripDist = 1000, tripTargetMs = 16*3600*1000;
+let tripStart = null, breakStart = null;
+let totalBreakMs = 0, breaks = [];
+let coveredKm = 0, lastPos = null;
+let geoWatch = null;
+let ticker = null;
+let lastGpsSpeed = null;
+
+function fmt(ms) {
+  const s = Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sc=s%60;
+  return h+':'+pad(m)+':'+pad(sc);
+}
+function fmtHM(ms) {
+  const t=Math.floor(ms/60000), h=Math.floor(t/60), m=t%60;
+  return h+'h '+pad(m)+'m';
+}
+function pad(n){return String(n).padStart(2,'0');}
+function fmtTime(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function d1(v){return isFinite(v)?v.toFixed(1):'–';}
+function d0(v){return isFinite(v)?Math.round(v)+'':'–';}
+
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function startTrip(){
+  const dist = parseFloat(document.getElementById('inpDist').value)||1000;
+  const hrs = parseFloat(document.getElementById('inpHours').value)||0;
+  const mins = parseFloat(document.getElementById('inpMins').value)||0;
+  tripDist = dist;
+  tripTargetMs = (hrs*3600 + mins*60)*1000;
+  if(tripTargetMs < 60000){ alert('Please set a valid target time'); return; }
+
+  document.getElementById('inpDistLabel').textContent = dist+' km';
+  document.getElementById('targetSpeedBase').innerHTML = d1(dist/(tripTargetMs/3600000))+'<span class="unit">km/h</span>';
+
+  tripStart = Date.now();
+  document.getElementById('setupPanel').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('bottomStrip').style.display='grid';
+
+  const arrivalTime = new Date(tripStart + tripTargetMs);
+  document.getElementById('btmArrival').textContent = fmtTime(arrivalTime);
+
+  startGPS();
+  ticker = setInterval(updateUI, 2000);
+}
+
+function startGPS(){
+  if(!navigator.geolocation){ showGPSError('Geolocation not supported by this browser.'); return; }
+  document.getElementById('gpsDot').classList.add('active');
+  document.getElementById('gpsLabel').textContent = 'Acquiring…';
+  geoWatch = navigator.geolocation.watchPosition(onPosition, onGPSError, {
+    enableHighAccuracy: true, timeout: 15000, maximumAge: 2000
+  });
+}
+
+function onPosition(pos){
+  document.getElementById('gpsLabel').textContent = 'GPS live';
+  const {latitude:lat, longitude:lon, speed} = pos.coords;
+  if(lastPos){
+    const d = haversine(lastPos.lat, lastPos.lon, lat, lon);
+    if(d < 500) coveredKm += d;
+  }
+  lastPos = {lat, lon};
+  lastGpsSpeed = (speed != null && speed >= 0) ? speed * 3.6 : null;
+  updateUI();
+}
+
+function onGPSError(err){
+  document.getElementById('gpsLabel').textContent = 'GPS error';
+  document.getElementById('gpsDot').classList.remove('active');
+  showGPSError('GPS error: '+err.message+'. Make sure location permission is allowed in your browser settings.');
+}
+
+function showGPSError(msg){
+  document.getElementById('gpsError').innerHTML = '<div class="gps-error"><strong>⚠ Location Error</strong>'+msg+'</div>';
+}
+
+function updateUI(){
+  if(!tripStart) return;
+  const now = Date.now();
+  const elapsed = now - tripStart;
+  const curBreak = breakStart ? now - breakStart : 0;
+  const totalB = totalBreakMs + curBreak;
+  const drivingMs = elapsed - totalB;
+
+  document.getElementById('btmElapsed').textContent = fmt(elapsed);
+  document.getElementById('btmBreak').textContent = fmtHM(totalB);
+
+  const km = coveredKm;
+  const remKm = Math.max(0, tripDist - km);
+  const elHr = elapsed/3600000;
+  const drHr = drivingMs/3600000;
+  const timeLeftMs = tripTargetMs - elapsed;
+  const timeLeftHr = timeLeftMs/3600000;
+
+  const avgTotal = elHr > 0 ? km/elHr : 0;
+  const avgDrive = drHr > 0.001 ? km/drHr : 0;
+  const baseTarget = tripDist/(tripTargetMs/3600000);
+  const expectedKmNow = baseTarget * elHr;
+  const gap = km - expectedKmNow;
+  const requiredNow = timeLeftHr > 0 ? remKm/timeLeftHr : Infinity;
+  const etaHr = avgDrive > 0 ? remKm/avgDrive : null;
+
+  const spd = lastGpsSpeed;
+  document.getElementById('liveSpeed').innerHTML = (spd!=null?d1(spd):'–')+'<span class="unit">km/h</span>';
+  document.getElementById('liveDist').innerHTML = d1(km)+'<span class="unit">km</span>';
+  document.getElementById('liveAvgTotal').innerHTML = d1(avgTotal)+'<span class="unit">km/h</span>';
+  document.getElementById('liveAvgDrive').innerHTML = d1(avgDrive)+'<span class="unit">km/h</span>';
+
+  if(etaHr!=null && etaHr < 100){
+    const etaDate = new Date(now + etaHr*3600000);
+    document.getElementById('liveETA').textContent = fmtTime(etaDate);
+  } else {
+    document.getElementById('liveETA').textContent = '–';
+  }
+
+  document.getElementById('targetSpeedNow').innerHTML = (isFinite(requiredNow)?d1(requiredNow):'–')+'<span class="unit">km/h</span>';
+  document.getElementById('targetDistNow').innerHTML = d1(expectedKmNow)+'<span class="unit">km</span>';
+  document.getElementById('targetRemDist').innerHTML = d1(remKm)+'<span class="unit">km</span>';
+
+  if(timeLeftMs > 0){
+    document.getElementById('targetRemTime').textContent = fmtHM(timeLeftMs);
+  } else {
+    document.getElementById('targetRemTime').textContent = 'Time up!';
+  }
+
+  const diffKm = Math.abs(gap).toFixed(1);
+  const diffEl = document.getElementById('paceDiff');
+  if(km < 1){
+    diffEl.innerHTML='';
+  } else if(gap >= 0.5){
+    diffEl.innerHTML=`<div class="diff-pill ahead">+${diffKm} km ahead</div>`;
+  } else if(gap <= -0.5){
+    diffEl.innerHTML=`<div class="diff-pill behind">-${diffKm} km behind</div>`;
+  } else {
+    diffEl.innerHTML=`<div class="diff-pill ontrack">On track</div>`;
+  }
+
+  const barPct = Math.min(100, (km/tripDist)*100);
+  const expPct = Math.min(100, (expectedKmNow/tripDist)*100);
+  document.getElementById('paceBarFill').style.width = barPct+'%';
+  document.getElementById('paceBarFill').style.background = gap < -5 ? 'var(--danger)' : gap > 5 ? 'var(--accent)' : 'var(--info)';
+  document.getElementById('paceBarExp').style.left = expPct+'%';
+  document.getElementById('paceBarPct').textContent = barPct.toFixed(1)+'%';
+
+  updateAdvice(spd, requiredNow, gap, remKm, timeLeftMs, avgDrive);
+}
+
+function updateAdvice(spd, req, gap, remKm, timeLeftMs, avgDrive){
+  const box = document.getElementById('adviceBox');
+  if(timeLeftMs <= 0){
+    box.className='advice-box danger';
+    box.textContent="⏱ Target time has passed. You are beyond your planned schedule.";
+    return;
+  }
+  if(remKm <= 0){
+    box.className='advice-box';
+    box.textContent="🏁 You've reached the destination!";
+    return;
+  }
+  if(spd == null){
+    box.className='advice-box';
+    box.textContent="📡 Acquiring GPS signal… drive normally and the tracker will calibrate.";
+    return;
+  }
+  const reqR = Math.round(req);
+  const spdR = Math.round(spd);
+  const diff = req - spd;
+
+  if(diff > 20){
+    box.className='advice-box danger';
+    box.textContent=`🚨 You're ${Math.round(diff)} km/h below target. Need ${reqR} km/h but doing ${spdR} km/h. Significantly behind schedule — consider reducing break time.`;
+  } else if(diff > 8){
+    box.className='advice-box warn';
+    box.textContent=`⚠️ Slightly behind. Aim for ${reqR} km/h (currently ${spdR} km/h). You need to pick up pace by ${Math.round(diff)} km/h.`;
+  } else if(diff < -15){
+    box.className='advice-box';
+    box.textContent=`✅ Well ahead of schedule! You're doing ${spdR} km/h vs required ${reqR} km/h. You can afford to take a longer break or slow down by ${Math.round(-diff)} km/h.`;
+  } else if(diff < -5){
+    box.className='advice-box';
+    box.textContent=`👍 Ahead of target. ${spdR} km/h vs required ${reqR} km/h. You have a ${Math.round(-diff)} km/h buffer.`;
+  } else {
+    box.className='advice-box';
+    box.textContent=`🟢 Right on pace. ${spdR} km/h ≈ required ${reqR} km/h. Keep it steady.`;
+  }
+}
+
+function toggleBreak(){
+  const btn = document.getElementById('btnBreak');
+  if(!breakStart){
+    breakStart = Date.now();
+    btn.textContent='▶ Resume';
+    btn.classList.add('on-break');
+  } else {
+    const dur = Date.now()-breakStart;
+    breaks.push({start:breakStart, end:Date.now(), dur});
+    totalBreakMs += dur;
+    renderBreaks();
+    breakStart = null;
+    btn.textContent='☕ Break';
+    btn.classList.remove('on-break');
+  }
+}
+
+function renderBreaks(){
+  const log = document.getElementById('breakLog');
+  document.getElementById('breakSection').style.display='block';
+  log.innerHTML = breaks.map((b,i)=>
+    `<div class="break-row">
+      <span class="break-num">#${i+1}</span>
+      <span style="color:var(--muted)">${fmtTime(new Date(b.start))} → ${fmtTime(new Date(b.end))}</span>
+      <span class="break-dur">${fmt(b.dur)}</span>
+    </div>`
+  ).join('');
+}
+
+function endTrip(){
+  if(breakStart) toggleBreak();
+  clearInterval(ticker); ticker=null;
+  if(geoWatch!=null) navigator.geolocation.clearWatch(geoWatch);
+  updateUI();
+  document.getElementById('btnBreak').style.display='none';
+  document.getElementById('gpsLabel').textContent='Trip ended';
+  document.getElementById('gpsDot').classList.remove('active');
+}
+</script>
+</body>
+</html>
